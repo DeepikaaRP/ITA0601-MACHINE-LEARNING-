@@ -1,0 +1,129 @@
+import pandas as pd
+
+# Load the Iris dataset
+df = pd.read_csv("Iris (1).csv")
+
+# Remove ID column if present
+df = df.drop(columns=["Id"], errors="ignore")
+
+# Separate features and target
+X = df.iloc[:, :-1].copy()
+y = df.iloc[:, -1].astype(str).str.strip()
+
+# Convert numerical features into categories
+for col in X.columns:
+    X[col] = pd.cut(
+        X[col],
+        bins=3,
+        labels=["Low", "Medium", "High"],
+        include_lowest=True
+    )
+
+# Convert examples into lists
+X = X.astype(str).values.tolist()
+domains = [
+    sorted(set(row[j] for row in X))
+    for j in range(len(X[0]))
+]
+
+# Positive class
+positive_class = "Iris-setosa"
+n = len(domains)
+
+# Initial boundaries
+S = {tuple(["Ø"] * n)}
+G = {tuple(["?"] * n)}
+
+def covers(h, x):
+    return all(
+        h[i] == "?" or h[i] == x[i]
+        for i in range(n)
+    )
+
+def more_general(h1, h2):
+    return all(
+        h1[i] == "?" or h1[i] == h2[i] or h2[i] == "Ø"
+        for i in range(n)
+    )
+
+def minimal_generalizations(s, x):
+    h = list(s)
+    for i in range(n):
+        if h[i] == "Ø":
+            h[i] = x[i]
+        elif h[i] != x[i]:
+            h[i] = "?"
+    return {tuple(h)}
+
+def minimal_specializations(g, x, S):
+    results = set()
+    for i in range(n):
+        if g[i] == "?":
+            for value in domains[i]:
+                if value != x[i]:
+                    h = list(g)
+                    h[i] = value
+                    h = tuple(h)
+                    # Keep specializations at least as general as an S hypothesis
+                    if any(more_general(h, s) for s in S):
+                        results.add(h)
+    return results
+
+for x, label in zip(X, y):
+    x = tuple(x)
+    if label == positive_class:
+        # Remove G hypotheses that reject positive example
+        G = {g for g in G if covers(g, x)}
+
+        new_S = set()
+        for s in S:
+            if covers(s, x):
+                new_S.add(s)
+            else:
+                for h in minimal_generalizations(s, x):
+                    if any(more_general(g, h) for g in G):
+                        new_S.add(h)
+
+        # Keep maximally specific S hypotheses
+        S = {
+            h for h in new_S
+            if not any(
+                h != other and more_general(h, other)
+                for other in new_S
+            )
+        }
+    else:
+        # Remove S hypotheses that accept negative example
+        S = {s for s in S if not covers(s, x)}
+
+        new_G = set()
+        for g in G:
+            if not covers(g, x):
+                new_G.add(g)
+            else:
+                new_G.update(minimal_specializations(g, x, S))
+
+        # Keep maximally general G hypotheses
+        G = {
+            h for h in new_G
+            if not any(
+                h != other and more_general(other, h)
+                for other in new_G
+            )
+        }
+
+# Display final boundaries
+print("Candidate-Elimination Algorithm")
+print("--------------------------------")
+print("Positive Class:", positive_class)
+
+print("\nSpecific Boundary (S):")
+for h in sorted(S):
+    print(h)
+
+print("\nGeneral Boundary (G):")
+for h in sorted(G):
+    print(h)
+
+if not S and not G:
+    print("\nNo consistent hypotheses remain.")
