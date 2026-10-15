@@ -1,0 +1,48 @@
+import pandas as pd
+
+# Load dataset
+df = pd.read_csv("Iris (1).csv")
+
+# Remove ID column if present
+df = df.drop(columns=["Id"], errors="ignore")
+
+# Separate features and target
+X = df.iloc[:, :-1].copy()
+y = df.iloc[:, -1].copy()
+
+# Convert numerical features into categories
+for col in X.columns:
+    X[col] = pd.cut(
+        X[col],
+        bins=3,
+        labels=["Low", "Medium", "High"],
+        include_lowest=True
+    )
+
+# Select positive class
+positive_class = "Iris-setosa"
+
+# Initialize the most specific hypothesis
+hypothesis = [""] * len(X.columns)
+
+# FIND-S algorithm
+for i in range(len(X)):
+    if y.iloc[i] == positive_class:
+        example = X.iloc[i].astype(str).tolist()
+
+        # First positive example
+        if hypothesis == [""] * len(X.columns):
+            hypothesis = example.copy()
+        else:
+            # Generalize inconsistent attributes
+            for j in range(len(hypothesis)):
+                if hypothesis[j] != example[j]:
+                    hypothesis[j] = "?"
+
+# Display final output only
+print("FIND-S Algorithm")
+print("------------------------------")
+print("Positive Class:", positive_class)
+print("\nFinal Most Specific Hypothesis:")
+for col, value in zip(X.columns, hypothesis):
+    print(col, ":", value)
