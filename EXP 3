@@ -1,0 +1,150 @@
+import pandas as pd
+import math
+from google.colab import files
+
+# 1. Upload the dataset
+uploaded = files.upload()
+filename = next(iter(uploaded))
+df = pd.read_csv(filename)
+
+print("Dataset Shape:", df.shape)
+print("\nWeather Class Distribution:")
+print(df["weather"].value_counts())
+
+# 2. Convert numerical values into categories
+df["precipitation"] = pd.cut(
+    df["precipitation"],
+    bins=[-0.01, 0, 2.8, float("inf")],
+    labels=["none", "light", "heavy"]
+).astype(str)
+
+df["temp_max"] = pd.cut(
+    df["temp_max"],
+    bins=[-float("inf"), 10, 20, float("inf")],
+    labels=["cold", "mild", "hot"]
+).astype(str)
+
+df["temp_min"] = pd.cut(
+    df["temp_min"],
+    bins=[-float("inf"), 5, 12, float("inf")],
+    labels=["cold", "mild", "warm"]
+).astype(str)
+
+df["wind"] = pd.cut(
+    df["wind"],
+    bins=[-float("inf"), 2.5, 4.5, float("inf")],
+    labels=["low", "moderate", "high"]
+).astype(str)
+
+# Use weather as the target; date is not required
+df = df[[
+    "precipitation", "temp_max",
+    "temp_min", "wind", "weather"
+]].dropna()
+
+# 3. Calculate Entropy
+def entropy(target):
+    probabilities = target.value_counts(normalize=True)
+    return -sum(p * math.log2(p) for p in probabilities)
+
+# 4. Calculate Information Gain
+def information_gain(data, attribute):
+    total_entropy = entropy(data["weather"])
+    weighted_entropy = 0
+
+    for value in data[attribute].unique():
+        subset = data[data[attribute] == value]
+        weighted_entropy += (
+            len(subset) / len(data)
+        ) * entropy(subset["weather"])
+
+    return total_entropy - weighted_entropy
+
+# 5. Implement the ID3 algorithm
+def id3(data, attributes):
+    # Stop if all records have the same class
+    if data["weather"].nunique() == 1:
+        return data["weather"].iloc[0]
+
+    # Stop if no attributes remain
+    if not attributes:
+        return data["weather"].mode()[0]
+
+    # Select the attribute with maximum Information Gain
+    gains = {
+        attr: information_gain(data, attr)
+        for attr in attributes
+    }
+
+    best_attribute = max(gains, key=gains.get)
+    tree = {best_attribute: {}}
+
+    for value in data[best_attribute].unique():
+        subset = data[data[best_attribute] == value]
+
+        if subset.empty:
+            tree[best_attribute][value] = data["weather"].mode()[0]
+        else:
+            remaining = [
+                attr for attr in attributes
+                if attr != best_attribute
+            ]
+            tree[best_attribute][value] = id3(
+                subset, remaining
+            )
+
+    return tree
+
+# Helper function to print the tree in a beautiful hierarchical layout
+def print_tree(tree, indent=""):
+    if not isinstance(tree, dict):
+        print(" ->", tree)
+        return
+    
+    attribute = list(tree.keys())[0]
+    for value, subtree in tree[attribute].items():
+        print(f"{indent}* If {attribute} is '{value}':", end="")
+        if isinstance(subtree, dict):
+            print()
+            print_tree(subtree, indent + "  ")
+        else:
+            print(f" Predict: {subtree}")
+
+# 6. Build the decision tree
+attributes = [
+    "precipitation", "temp_max", "temp_min", "wind"
+]
+
+print("\nInformation Gain at Root:")
+for attr in attributes:
+    print(attr, ":", round(information_gain(df, attr), 4))
+
+tree = id3(df, attributes)
+
+print("\nID3 Decision Tree Structure:")
+print_tree(tree)
+
+# 7. Classify a new sample
+def predict(tree, sample, default="rain"):
+    if not isinstance(tree, dict):
+        return tree
+
+    attribute = next(iter(tree))
+    value = sample[attribute]
+
+    if value not in tree[attribute]:
+        return default
+
+    return predict(tree[attribute][value], sample, default)
+
+new_sample = {
+    "precipitation": "none",
+    "temp_max": "mild",
+    "temp_min": "mild",
+    "wind": "moderate"
+}
+
+prediction = predict(tree, new_sample, df["weather"].mode()[0])
+
+print("\nNew Sample:", new_sample)
+print("Predicted Weather:", prediction)
