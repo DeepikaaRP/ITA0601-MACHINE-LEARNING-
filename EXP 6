@@ -1,0 +1,59 @@
+import pandas as pd
+import zipfile
+from google.colab import files
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+# Upload the files
+uploaded = files.upload()
+
+# Find the training file specifically (looking for 'train' in the filename)
+train_file = None
+for name in uploaded.keys():
+    if "train" in name.lower() and name.endswith(".csv"):
+        train_file = name
+        break
+
+# If no explicit 'train' file was identified, fall back to the first file
+if train_file is None:
+    train_file = next(iter(uploaded))
+
+# Handle zip files containing multiple entries
+if train_file.endswith('.zip'):
+    with zipfile.ZipFile(train_file, 'r') as zip_ref:
+        # Read 'train.csv' directly from the zip archive
+        with zip_ref.open('train.csv') as f:
+            df = pd.read_csv(f)
+else:
+    df = pd.read_csv(train_file)
+
+# Separate features and target
+X = df.drop("price_range", axis=1)
+if "id" in X.columns:
+    X = X.drop("id", axis=1) # Drop 'id' column if present
+y = df["price_range"]
+
+# Split dataset
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Train the model
+model = RandomForestClassifier(
+    n_estimators=100, random_state=42
+)
+model.fit(X_train, y_train)
+
+# Test the model
+y_pred = model.predict(X_test)
+
+print("Accuracy:", round(accuracy_score(y_test, y_pred) * 100, 2), "%")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+# Predict price range for a new mobile
+new_mobile = X.iloc[[0]].copy()
+prediction = model.predict(new_mobile)
+
+print("Predicted Price Range:", prediction[0])
