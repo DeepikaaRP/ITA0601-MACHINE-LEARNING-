@@ -1,0 +1,70 @@
+# Import required libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# Create sample car dataset
+data = {
+    'Age': [1, 2, 3, 4, 5, 6, 2, 3, 5, 7, 1, 4, 6, 8, 3],
+    'Mileage': [10000, 20000, 30000, 40000, 50000, 60000,
+                15000, 25000, 45000, 70000, 12000, 35000,
+                65000, 80000, 28000],
+    'Engine_Size': [1200, 1500, 1000, 1200, 1500, 1000,
+                    1200, 1500, 1000, 1200, 1500, 1000,
+                    1200, 1500, 1500],
+    'Fuel_Type': ['Petrol', 'Diesel', 'Petrol', 'Diesel', 'Petrol',
+                  'Diesel', 'Petrol', 'Diesel', 'Petrol', 'Diesel',
+                  'Petrol', 'Diesel', 'Petrol', 'Diesel', 'Petrol'],
+    'Price': [800000, 750000, 650000, 600000, 500000, 450000,
+              780000, 700000, 520000, 350000, 850000, 620000,
+              400000, 300000, 680000]
+}
+
+df = pd.DataFrame(data)
+
+# Convert categorical fuel type into numerical values
+df['Fuel_Type'] = df['Fuel_Type'].map({'Petrol': 0, 'Diesel': 1})
+
+# Separate input and output
+X = df[['Age', 'Mileage', 'Engine_Size', 'Fuel_Type']]
+y = df['Price']
+
+# Split dataset into training and testing data
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# Create and train Linear Regression model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Predict test data
+y_pred = model.predict(X_test)
+
+# Display model accuracy metrics
+print("Mean Absolute Error:", mean_absolute_error(y_test, y_pred))
+print("Mean Squared Error:", mean_squared_error(y_test, y_pred))
+print("R2 Score:", r2_score(y_test, y_pred))
+
+# Predict the price of a new car
+new_car = pd.DataFrame({
+    'Age': [2],
+    'Mileage': [18000],
+    'Engine_Size': [1500],
+    'Fuel_Type': [0]
+})
+
+predicted_price = model.predict(new_car)
+print("\nPredicted Car Price: Rs.", round(predicted_price[0], 2))
+
+# Display actual vs predicted prices
+plt.figure(figsize=(7, 5))
+plt.scatter(y_test, y_pred, color='blue')
+plt.xlabel("Actual Car Price")
+plt.ylabel("Predicted Car Price")
+plt.title("Actual vs Predicted Car Prices")
+plt.grid(True)
+plt.show()
