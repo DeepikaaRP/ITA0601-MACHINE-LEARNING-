@@ -1,0 +1,54 @@
+import pandas as pd
+from google.colab import files
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report
+
+# 1. Upload dataset
+uploaded = files.upload()
+df = pd.read_csv(next(iter(uploaded)))
+
+# 2. Remove unnecessary columns
+df = df.drop(columns=["ID", "Customer_ID", "Name", "SSN"],
+             errors="ignore")
+
+# 3. Handle missing values
+df = df.dropna(subset=["Credit_Score"])
+
+for col in df.columns:
+    if df[col].dtype == "object" and col != "Credit_Score":
+        df[col] = df[col].fillna(df[col].mode()[0])
+    elif df[col].dtype != "object":
+        df[col] = df[col].fillna(df[col].median())
+
+# 4. Convert categorical data into numbers
+for col in df.select_dtypes(include="object").columns:
+    encoder = LabelEncoder()
+    df[col] = encoder.fit_transform(df[col].astype(str))
+
+# 5. Separate input and output
+X = df.drop("Credit_Score", axis=1)
+y = df["Credit_Score"]
+
+# 6. Split dataset
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# 7. Train Random Forest model
+model = RandomForestClassifier(
+    n_estimators=100, random_state=42
+)
+model.fit(X_train, y_train)
+
+# 8. Predict credit scores
+y_pred = model.predict(X_test)
+
+# 9. Evaluate model
+print("Accuracy:", accuracy_score(y_test, y_pred) * 100, "%")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+# 10. Predict a sample
+print("\nPredicted Credit Score:", model.predict(X_test.iloc[[0]])[0])
